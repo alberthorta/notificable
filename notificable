@@ -1,0 +1,44 @@
+#!/usr/bin/php5 -q
+<?php
+require_once(__DIR__."/vendor/autoload.php");
+
+$notificable = new Commando\Command();
+
+$notificable->option()
+  ->require()
+  ->must(function($element) {
+    if(in_array(strtoupper($element), ["LIST"])) return true;
+    return false;
+  });
+
+$function = "command".ucwords(strtolower($notificable[0]));
+call_user_func_array($function, [$notificable]);
+
+function getLeases($name = null)
+{
+  $leases = [];
+  exec("/opt/vyatta/bin/vyatta-op-cmd-wrapper show dhcp leases|grep dhcp", $leases);
+  $leases = array_map(function($line) {
+    return explode(" ",preg_replace("/\s\s+/"," ",$line),6);
+  }, $leases);
+  $leases = array_filter($leases, function($element) {
+    if(count($element)<6) return false;
+    return true;
+  });
+  if($name!==null) {
+    return current(array_filter($leases, function($element) {
+      if($leases[5]===$name) return true;
+      return false;
+    }));
+  } else {
+    return $leases;
+  }
+}
+
+function commandList(Commando\Command $command)
+{
+  $leases = getLeases();
+  array_walk($leases, function($element) {
+    echo("NAME        : ".$element[5]."\nMAC ADDRESS : ".$element[1]."\nIP          : ".$element[0]."\n\n");
+  });
+}
